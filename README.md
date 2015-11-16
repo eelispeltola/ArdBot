@@ -1,4 +1,4 @@
 # gitprojects
-baby's first
-and now for some more tests
-and more
+A small collection of personal projects
+Right now:
+- Rotary encoder for Arduino
