@@ -1,8 +1,8 @@
 /*
 ArdBot Rotation Encoder
 
-Module: encoder / File: encoder.h
-Takes a signal that clicks on repeatedly and converts it to
+Module: rotary encoder / File: RotEncoder.h
+Takes a signal that clicks on and off repeatedly and converts it to
 RPM measurements.
 
 The circuit:
@@ -23,7 +23,8 @@ By epe
 
 class Encoder {
 	public:
-		Encoder(const int pin, const float wheel_d, const int num_of_encs);
+		Encoder(const int pin, const float wheel_d, const int num_of_encs,
+				const unsigned long debounce_delay);
 		void setting();
 		volatile word count();
 		float distance();
@@ -31,9 +32,11 @@ class Encoder {
 		float velocity(const unsigned long milliseconds);
 	private:
 		int _pin;
-		int _circ;
+		float _circ;
 		int _encs;
-		volatile word _clickcount;
+		volatile word _tickcount;
+		unsigned long _debounce;
+		unsigned long _lastDebounce;
 };
 
 #endif // ENCODER_H
