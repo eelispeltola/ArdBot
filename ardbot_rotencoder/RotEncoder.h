@@ -1,17 +1,17 @@
 /*
-ArdBot RPM encoder
+ArdBot Rotation Encoder
 
 Module: encoder / File: encoder.h
 Takes a signal that clicks on repeatedly and converts it to
 RPM measurements.
 
 The circuit:
-* these attached to input this and this
-* these attached to output this and this
+* Single reed switch connected to input 'pin'
+* No outputs, switch connects to Gnd
 
 Created 12.09.2015
-Modified 29.10.2015
-For Arduino Nano, ATMega328
+Modified 03.01.2016
+For Arduino Nano, ATmega328
 By epe
 */
 
@@ -22,13 +22,18 @@ By epe
 
 
 class Encoder {
-public:
-	Encoder(int pin, int wheel_d, int num_of_encs);
-	uint distance();
-private:
-	int _pin;
-	int _diam;
-	int _encs;
+	public:
+		Encoder(const int pin, const float wheel_d, const int num_of_encs);
+		void setting();
+		volatile word count();
+		float distance();
+		void clear();
+		float velocity(const unsigned long milliseconds);
+	private:
+		int _pin;
+		int _circ;
+		int _encs;
+		volatile word _clickcount;
 };
 
 #endif // ENCODER_H
