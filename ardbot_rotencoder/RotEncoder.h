@@ -10,26 +10,26 @@ The circuit:
 * No outputs, switch connects to Gnd
 
 Created 12.09.2015
-Modified 03.01.2016
+Modified 04.01.2016
 For Arduino Nano, ATmega328
 By epe
 */
 
-#ifndef ENCODER_H
-#define ENCODER_H
+#ifndef ROTENCODER_H
+#define ROTENCODER_H
 
 #include "Arduino.h"
 
 
-class Encoder {
+class RotEncoder {
 	public:
-		Encoder(const int pin, const float wheel_d, const int num_of_encs,
+		RotEncoder(const int pin, const float wheel_d, const int num_of_encs,
 				const unsigned long debounce_delay);
 		void setting();
 		volatile word count();
 		float distance();
 		void clear();
-		float velocity(const unsigned long milliseconds);
+		float velocity();
 	private:
 		int _pin;
 		float _circ;
@@ -39,4 +39,4 @@ class Encoder {
 		unsigned long _lastDebounce;
 };
 
-#endif // ENCODER_H
+#endif // ROTENCODER_H
