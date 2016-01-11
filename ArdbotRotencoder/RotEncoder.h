@@ -3,14 +3,10 @@ ArdBot Rotation Encoder
 
 Module: rotary encoder / File: RotEncoder.h
 Takes a signal that clicks on and off repeatedly and converts it to
-RPM measurements.
-
-The circuit:
-* Single reed switch connected to input 'pin'
-* No outputs, switch connects to Gnd
+various RPM-type measurements.
 
 Created 12.09.2015
-Modified 04.01.2016
+Modified 11.01.2016
 For Arduino Nano, ATmega328
 By epe
 */
@@ -20,23 +16,22 @@ By epe
 
 #include "Arduino.h"
 
-
+// TODO: Clear up when tested in code
 class RotEncoder {
-	public:
-		RotEncoder(const int pin, const float wheel_d, const int num_of_encs,
-				const unsigned long debounce_delay);
-		void setting();
-		volatile word count();
-		float distance();
-		void clear();
-		float velocity();
-	private:
-		int _pin;
-		float _circ;
-		int _encs;
-		volatile word _tickcount;
-		unsigned long _debounce;
-		unsigned long _lastDebounce;
+public:
+	RotEncoder(const float wheel_d, const int num_of_encs);
+	volatile float count(volatile word clicks);
+	float distance(volatile word clicks);
+	//		void clear();
+	float velocity(volatile word clicks);
+	//		void trigger();
+private:
+	//		int _pin;
+	float _circ;
+	int _encs;
+	//		volatile word _tickcount;
+	//		unsigned long _debounce;
+	//		unsigned long _lastDebounce;
 };
 
 #endif // ROTENCODER_H
