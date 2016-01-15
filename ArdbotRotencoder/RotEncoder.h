@@ -6,7 +6,7 @@ Takes a signal that clicks on and off repeatedly and converts it to
 various RPM-type measurements.
 
 Created 12.09.2015
-Modified 12.01.2016
+Modified 16.01.2016
 For Arduino Nano, ATmega328
 By epe
 */
@@ -20,9 +20,10 @@ By epe
 class RotEncoder {
 public:
 	RotEncoder(const float wheel_d, const int num_of_encs);
-	volatile float count(volatile unsigned int clicks);
+	volatile float rotations(volatile unsigned int clicks);
 	float distance(volatile unsigned int clicks);
-	float velocity(volatile unsigned int clicks);
+	float velocity(volatile unsigned int clicks, unsigned long interval,
+		float& oldDistance);
 private:
 	float _circ;
 	int _encs;
