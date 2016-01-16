@@ -1,13 +1,15 @@
 /* 
- * ArdBot v1.0.
+ * ArdBot v1.1.
  * Arduino Nano, ATmega328.
  * Two continuos rotation servos, piezo speaker.
- * Sensors: IR diode (Sony remote controlled), two leaf switches.
- * Started 26.08.2015.
- * Last modified 12.09.2015.
+ * Sensors: IR diode (Sony remote controlled), two IR
+ * receivers and IR LEDs.
+ * Started 16.01.2016.
+ * Last modified 16.01.2016.
  * epe
  */
 
+#include <RotEncoder.h>
 #include <IRremote.h>
 #include <Servo.h>
 #include "pitches.h"
@@ -21,22 +23,44 @@ int RECV_PIN = 5;
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
+// Define encoders
+RotEncoder leftenc(68.5, 2);  // wheel diam (mm), encoder magnets
+RotEncoder rightenc(68.5, 2);  // wheel diam (mm), encoder magnets
+
 // Define variables for bumpers
 volatile int bLeft = LOW;
 volatile int bRight = LOW;
 
+// Define variables for encoders
+volatile unsigned int clicksLeft = 0;
+volatile unsigned int clicksRight = 0;
+
+// Define variables for debouncing
+unsigned int debDelay = 20;
+unsigned long lastDebounceLeft = 0;
+unsigned long lastDebounceRight = 0;
+
+// Define variables for velocity reading
+unsigned long oldMillis = 0;
+float oldDist = 0;
+float vel = 0;
+
 boolean started = false;
 
 void setup() {
-  // Set pin modes for switches
-  pinMode(2, INPUT);     // Redundant code, all pins def inputs
-  pinMode(3, INPUT);     // See above
-  pinMode(4, OUTPUT);
-  digitalWrite(2, HIGH);
-  digitalWrite(3, HIGH);
-  digitalWrite(4, LOW);     // Ground
+  // Set pin modes for encoders
+  // TODO: Rewire grounds to breadboard GND
+  digitalWrite(2, HIGH);    // Left enc
+  digitalWrite(3, HIGH);    // Right enc
 
+  // Set pin modes for microswitches
+  const int leftSwitch = 10;
+  const int RightSwitch = 4;
+  digitalWrite(leftSwitch, HIGH);
+  digitalWrite(RightSwitch, HIGH);
+  
   // Set pin modes for IR receiver and speaker
+  // TODO: Grounds to breadboard GND
   pinMode(6, OUTPUT);
   pinMode(7, OUTPUT);
   digitalWrite(6, LOW);     // IR ground
@@ -50,14 +74,22 @@ void setup() {
 
   Serial.begin(9600);
 
-  // Set interrupts
-  attachInterrupt(1, hitRight, FALLING);
-  attachInterrupt(0, hitLeft, FALLING);
-
+  // Set interrupts for encoders
+  attachInterrupt(digitalPinToInterrupt(2), trigLeft, FALLING);
+  attachInterrupt(digitalPinToInterrupt(3), trigRight, FALLING);
+  
   started = true;
 }
 
 void loop() {
+  if (leftSwitch == LOW) {    // If left bumper connects to GND
+    bLeft == HIGH;
+  }
+
+  else if (rightSwitch == LOW) {    // If right bumper to GND
+    bRight == HIGH;
+  }
+  
   if (bLeft == HIGH) {          // If left bumper hit
     Serial.println("bLeft");
     int notes[] = {NOTE_FS3, NOTE_F3, NOTE_D3};
@@ -126,6 +158,33 @@ void loop() {
     irrecv.resume();     // Ready to receive next value
     delay(2);
   }
+
+  // Number of rotations for both wheels
+  volatile float leftrotations = leftenc.count(clickcounts);
+  volatile float rightrotations = rightenc.count(clickcounts);
+
+  // Distance as avg of both wheels
+  float dist = (leftenc.distance(clickcounts) +
+               righttenc.distance(clickcounts))/2;
+
+  // Velocity as avg of both wheels
+  unsigned long interval = millis() - oldMillis;
+  if (interval > 2000) {
+    vel = (leftenc.velocity(clickcounts, interval, oldDist) + 
+          rightenc.velocity(clickcounts, interval, oldDist))/2;
+    
+    Serial.print("Rotations (left): ";
+    Serial.print(leftrotations);
+    Serial.print("Rotations (right): ";
+    Serial.print(rightrotations);
+    Serial.print(" ; Distance: ");
+    Serial.print(dist);
+    Serial.print(" m");
+    Serial.print(" ; Speed: ");
+    Serial.print(vel);
+    Serial.println(" m/s");
+    
+  }
 }
 
 void makeTone(int notes[], int noteDurations[], int length) {
@@ -182,11 +241,17 @@ void turnRightRev() {
 }
 
 // Interrupt handlers
-void hitLeft() {
-  if(started)
-    bLeft = HIGH;
+void trigLeft() {
+  if (started and 
+      (millis() - lastDebounceLeft) > debDelay) {
+    clicksLeft++;
+    lastDebounceLeft = millis();
+  }
 }
-void hitRight() {
-  if(started)
-    bRight = HIGH;
+void trigRight() {
+  if (started and 
+      (millis() - lastDebounceRight) > debDelay) {
+    clicksRight++;
+    lastDebounceRight = millis();
+  }
 }
