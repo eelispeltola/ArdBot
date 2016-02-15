@@ -35,6 +35,10 @@ volatile int bRight = LOW;
 volatile unsigned int clicksLeft = 0;
 volatile unsigned int clicksRight = 0;
 
+// Define pins for bumpers
+const int leftSwitch = 10;
+const int RightSwitch = 4;
+
 // Define variables for debouncing
 unsigned int debDelay = 20;
 unsigned long lastDebounceLeft = 0;
@@ -54,8 +58,6 @@ void setup() {
   digitalWrite(3, HIGH);    // Right enc
 
   // Set pin modes for microswitches
-  const int leftSwitch = 10;
-  const int RightSwitch = 4;
   digitalWrite(leftSwitch, HIGH);
   digitalWrite(RightSwitch, HIGH);
   
