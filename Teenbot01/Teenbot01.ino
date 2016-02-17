@@ -1,10 +1,12 @@
 /*
  TeenBot v1.0
- Teensy 3.2, Raspberry Pi 2 with Rasbian Jessie, 
+ Teensy 3.2, Raspberry Pi 2 with Rasbian Jessie, SF TB6612FNG
+ motor driver breakout
  Actuators: two 4.5 V 48:1 DAGU motors, piezo speaker, RGB led
- Sensors: IR receiver (Sony remote controlled), Sharp IS471F
-	proximity detector and Siemens SFH 205f photodiode (IR sensor)
- 	with IR LEDs, two USB webcams used by RPi w/ OpenCV
+ Sensors: IR receiver (Sony remote controlled), two DAGU
+	hall effect encoders, Sharp IS471F proximity detector
+	and Siemens SFH 205f photodiode (IR recv) with IR LEDs,
+	two USB webcams used by RPi w/ OpenCV
  Started 16.02.2016.
  Last modified 17.02.2016.
  epe
@@ -12,32 +14,36 @@
 
 #include <RotEncoder.h>
 #include <IRremote.h>
-#include <Servo.h>
 #include "pitches.h"
 
 // Pin designation:
-const int IRRECV_PIN = 5;
+const int IRRECV_PWR_PIN = 0;	// IR (remote) receiver power
+const int IRRECV_GND_PIN = 1;	// IR receiver ground
+const int IRRECV_PIN = 2;	// IR receiver data 
 
-const int MOTORA_PWM_PIN = 0;	// Left motor
-const int MOTORA_IN1_PIN = 0;
-const int MOTORA_IN2_PIN = 0;
-const int MOTORB_PWM_PIN = 0;	// Right motor
-const int MOTORB_IN1_PIN = 0;
-const int MOTORB_IN2_PIN = 0;
+const int MOTOR_PWMA_PIN = 3;	// Left motor
+const int MOTOR_AIN2_PIN = 4;
+const int MOTOR_AIN1_PIN = 5;
+const int MOTOR_STBY_PIN = 6;	// Standby
+const int MOTOR_BIN1_PIN = 7;	// Right motor
+const int MOTOR_BIN2_PIN = 8;
+const int MOTOR_PWMB_PIN = 9;
 
-const int IRLEDL_PIN = 0;	// Left IR led TODO: which one out
-const int IRLEDR_PIN = 0;	// Right IR led
-const int IRSENSEL_PIN = 0;
-const int IRSENSER_PIN = 0;
+const int SPEAKER_PIN = 11;	// Piezo speaker
+const int SPEAKER_GND_PIN = 12;
 
-const int SPEAKER_PIN = 0;
-const int SPEAKER_GND_PIN = 0;
+const int IRLEDR_PIN = 23;	// Right IR led
+const int IRSENSEL_PIN = A5;	// IS471F, left detector data in
+const int IRSENSER_PIN = A4;	// SHF 205f, right detector data in
 
-const int RGB_R_PIN = 0;
-const int RGB_G_PIN = 0;
-const int RGB_B_PIN = 0;
-const int RGB_INTS_PIN = 0;	// RGB led intensity
+const int ENCL_IN_PIN = 17;	// Left encoder data in 
+const int ENCL_PWR_PIN = 16;	// Left encoder power
+const int ENCR_PWR_PIN = 14;	// Right encoder
+const int ENCR_IN_PIN = 13;
 
+const int RGB_R_PIN = A8;	// Common cathode RGB led
+const int RGB_G_PIN = A7;
+const int RGB_B_PIN = A6;
 
 
 // Define IRremote objects
@@ -53,7 +59,7 @@ RotEncoder rightenc(68.5, 2);  // wheel diam (mm)
 unsigned long oldMillis = 0;
 float oldDist = 0;
 float vel = 0;
-// Variables for encoders
+// Variables for interrupts and debouncing
 volatile unsigned int ticksLeft = 0;
 volatile unsigned int ticksRight = 0;
 unsigned int debDelay = 20;	// Debounce delay
