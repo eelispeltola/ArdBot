@@ -21,7 +21,7 @@ RotEncoder::RotEncoder(const float wheel_d, const int num_of_encs) {
 }
 
 
-// Returns number of rotations, rounded to the nearest integer.
+// Returns number of rotations.
 // TODO: Change to unsigned int for speed if too slow.
 volatile float RotEncoder::rotations(volatile unsigned int clicks) {
 	volatile float rotations{ clicks / _encs };
