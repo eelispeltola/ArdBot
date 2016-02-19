@@ -34,11 +34,9 @@ float RotEncoder::distance(volatile unsigned int clicks) {
 	return dist;
 }
 
-// Returns velocity in (m/s).
-// TODO: Test if any difference with millis() timekeeping.
-// TODO: v2 with no delay(), time automatically from loop()?
+// Returns velocity in (m/s). Requires main loop to run faster than <<interval>>
 float RotEncoder::velocity(volatile unsigned int clicks, unsigned long interval,
-	float& oldDistance) {
+						   float& oldDistance) {
 	float newDist{ distance(clicks) };
 	float velo{ (newDist - oldDistance) / interval };
 	oldDistance = newDist;
@@ -46,7 +44,7 @@ float RotEncoder::velocity(volatile unsigned int clicks, unsigned long interval,
 }
 
 // Clears tick count.
-// TODO: Change to clear something else?? Or scrap
+// TODO: Scrap? Kept for future modifications
 // void RotEncoder::clear() {
 //   _tickcount = 0;
 // }
