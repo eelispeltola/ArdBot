@@ -83,10 +83,12 @@ boolean started = false;
 void setup() {
 	Serial.begin(9600);
 
+	// RGB led
 	pinMode(RGB_R_PIN, OUTPUT);
 	pinMode(RGB_G_PIN, OUTPUT);
 	pinMode(RGB_B_PIN, OUTPUT);
-
+	
+	// Motor driver
 	pinMode(MOTOR_STBY_PIN, OUTPUT);
 	pinMode(MOTOR_PWMA_PIN, OUTPUT);
 	pinMode(MOTOR_AIN1_PIN, OUTPUT);
@@ -95,15 +97,21 @@ void setup() {
 	pinMode(MOTOR_BIN1_PIN, OUTPUT);
 	pinMode(MOTOR_BIN2_PIN, OUTPUT);
 
+	// Encoding
 	pinMode(ENCL_IN_PIN, INPUT_PULLUP);
 	pinMode(ENCR_IN_PIN, INPUT_PULLUP);
 
+	// IR receiver
 	pinMode(IRRECV_PWR_PIN, OUTPUT);	// IR recv power
 	digitalWrite(IRRECV_PWR_PIN, HIGH);
 	pinMode(IRRECV_GND_PIN, OUTPUT);	// IR recv ground
 	digitalWrite(IRRECV_GND_PIN, LOW);
 	pinMode(IRRECV_PIN, INPUT);
 
+	// IR obstacle sensing
+	pinMode(IRLEDR_PIN, OUTPUT);
+	pinMode(IRSENSEL_PIN, INPUT);
+	pinMode(IRSENSER_PIN, INPUT);
 
 	irrecv.enableIRIn();     // Start IR receiver
 
@@ -111,8 +119,13 @@ void setup() {
 	attachInterrupt(ENCL_IN_PIN, tickLeftEnc, CHANGE);
 	attachInterrupt(ENCR_IN_PIN, tickRightEnc, CHANGE);
 
+	// Set interrupt for Sharp IS471f IR proximity sensor
+	attachInterrupt(IRSENSEL_PIN, bumpRight, RISING);
 
 	started = true;
+
+	lampOn(255, 0, 255);
+
 }
 
 void loop() {
@@ -149,6 +162,7 @@ void loop() {
 	delay(1000);*/
 
 	/*if (bLeft == HIGH) {          // If left bumper hit
+		bLeft = LOW;
 		Serial.println("Bumped left");
 		int notes[] = { NOTE_FS3, NOTE_F3 };
 		int noteDurations[] = { 2,3 };
@@ -156,22 +170,19 @@ void loop() {
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
 		turn(90, 80, 'R');
-		delay(1500);
 		forward(100);
-		bLeft = LOW;
 	}
 
 	if (bRight == HIGH) {          // If right bumper hit
+		bRight = LOW;
 		Serial.println("Bumped right");
 		int notes[] = { NOTE_F4, NOTE_D4 };
-		int noteDurations[] = { 2,3 };
+		int noteDurations[] = { 3,3 };
 		reverse(70);
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
 		turn(90, 80, 'L');
-		delay(1500);
 		forward(100);
-		bRight = LOW;
 	}*/
 
 	//::Left encoder variables with RotEncoder library::
@@ -263,6 +274,47 @@ void loop() {
 	}
 }
 
+// Measures presence of UV light for one ms, outputs unitless
+// distance-to-obstacle value. Takes ambient UV light into account.
+float irSenseR() {
+	int halfPeriod = 30;  // One cycle in microseconds, divided in two
+	const int cycles = (int)(1 / (float(halfPeriod) * 2) * 1000);	// Cycles in 1 ms
+	int ambient = 0;
+	int illuminated = 0;
+	int distanceToObstacle = 0;
+	int irValues[cycles];
+	int i;
+
+	// Flashes IR led on/off for <<cycles>>, measuring ambient UV
+	// and UV bounced from led each time.
+	for (i = 0; i < cycles; i++) {
+		digitalWrite(IRLEDR_PIN, LOW);
+		delayMicroseconds(halfPeriod);
+		ambient = analogRead(IRSENSER_PIN);
+		digitalWrite(IRLEDR_PIN, HIGH);
+		delayMicroseconds(halfPeriod);
+		illuminated = analogRead(IRSENSER_PIN);
+		// Photodiode resistance grows with presence of UV light -> illuminated
+		// values are lower.
+		irValues[i] = ambient - illuminated;
+		distanceToObstacle += irValues[i];
+	}
+
+	/*Serial.print("Right IR values: ");
+	float distancetotarget = 0;
+	for (i = 0; i < cycles; i++) {
+	distancetotarget += irValues[i];
+	Serial.print(irValues[i]);
+	Serial.print(";");
+	}
+	Serial.println("");*/
+
+	// Distance is given as average of distances for the whole millisecond.
+	float avgDistance = distanceToObstacle / (float)cycles;
+	avgDistance = max(avgDistance, 0.0);
+
+	return avgDistance;
+}
 
 // Tones for piezo speaker
 void makeTone(int notes[], int noteDurations[], int length) {
@@ -279,7 +331,6 @@ void makeTone(int notes[], int noteDurations[], int length) {
 	irrecv.enableIRIn();
 	return;
 }
-
 
 // Move <<motor>> with <<speed>> and <<direction>>
 // Motor: A for left, B for right
@@ -326,6 +377,7 @@ void reverse(byte speed) {
 }
 
 // TODO: integrate speed sensors to bank with existing speed?
+//		Or take existing speed from global variable.
 // Turns right as it moves in <<direction>> with <<speed>>
 // Amount: 0...1, specifies sharpness of turning
 void bankRight(float amount, byte speed, int direction) {
@@ -344,7 +396,6 @@ void bankLeft(float amount, byte speed, int direction) {
 	Serial.println("Banking left");
 }
 
-// TODO: Bump sensing while turning
 // Turns <<degrees>> with <<speed>> in <<direction>> on the spot.
 // <<direction>> is 'l' or 'L' for left, or 'r' or 'R' for right.
 void turn(float degrees, byte speed, char direction) {
