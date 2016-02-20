@@ -8,13 +8,12 @@
 	and Siemens SFH 205f photodiode (IR recv) with IR LEDs,
 	two USB webcams used by RPi w/ OpenCV
  Started 16.02.2016.
- Last modified 17.02.2016.
+ Last modified 20.02.2016.
  epe
 */
 
 #include <RotEncoder.h>
-// #include <IRremote.h>	TODO: FIND ANOTHER LIBRARY
-// (IRremote not working on Teensy)
+#include <IRremote.h>
 #include "pitches.h"
 
 // Pin designation:
@@ -44,21 +43,25 @@ const int RGB_G_PIN = A7;
 const int RGB_B_PIN = A6;
 
 
-// Define IRremote objects (IRremote not working on Teensy)
-//IRrecv irrecv(IRRECV_PIN);
-//decode_results results;
+// Define IRremote objects
+IRrecv irrecv(IRRECV_PIN);
+decode_results results;
 
-// Define encoder objects
+// Define encoder objects (redundant to have both, left for fluency
+// in anticipation of future changes of RotEncoder class.
 RotEncoder leftEnc(62, 384);  // wheel diam (mm),
 							  // encoder ticks per rotation
 RotEncoder rightEnc(62, 384);  // wheel diam (mm)
 							   // encoder ticks per rotation
+
 // Variables for encoder velocity reading
-unsigned long oldMillis = 0;
+unsigned long oldMillisLeft = 0;
+unsigned long oldMillisRight = 0;
 float oldDistLeft = 0;
 float oldDistRight = 0;
 float velLeft = 0;
 float velRight = 0;
+
 // Variables for encoder interrupts and debouncing
 volatile unsigned int ticksLeft = 0;
 volatile unsigned int ticksRight = 0;
@@ -71,9 +74,9 @@ volatile boolean bLeft = false;
 volatile boolean bRight = false;
 
 // Define led intensities
-unsigned int redIntensity = 0;
-unsigned int blueIntensity = 0;
-unsigned int greenIntensity = 0;
+byte redIntensity = 0;
+byte blueIntensity = 0;
+byte greenIntensity = 0;
 
 boolean started = false;
 
@@ -99,97 +102,76 @@ void setup() {
 	digitalWrite(IRRECV_PWR_PIN, HIGH);
 	pinMode(IRRECV_GND_PIN, OUTPUT);	// IR recv ground
 	digitalWrite(IRRECV_GND_PIN, LOW);
-	// pinMode(IRRECV_PIN, INPUT);	// IR recv data in TODO: AWAY FOR GOOD??
+	pinMode(IRRECV_PIN, INPUT);
 
-	//irrecv.enableIRIn();     // Start IR receiver
+
+	irrecv.enableIRIn();     // Start IR receiver
 
 	// Set interrupts for encoders
 	attachInterrupt(ENCL_IN_PIN, tickLeftEnc, CHANGE);
 	attachInterrupt(ENCR_IN_PIN, tickRightEnc, CHANGE);
+
 
 	started = true;
 }
 
 void loop() {
 
-	forward(100);
-	delay(200);
-	reverse(80);
-	delay(100);
-	bankLeft(0.7, 255, 0);
-	delay(150);
+	/*lampOn(255, 0, 0);
+	delay(1000);
+	bankLeft(0.3, 200, 0);
+	delay(1000);
+	lampOn(255, 255, 255);
 	bankRight(0.1, 100, 1);
-	delay(400);
-	turnLeft(90, 150);
-	turnRight(270, 30);
+	delay(1000);
+	lampOff();
+	forward(50);
+	delay(200);
+	lampOn(30, 0, 250);
+	turn(90, 70, 'L');
+	stop();
+	lampOn(50, 150, 0);
+	delay(1000);
+	lampOn(0, 255, 0);
+	turn(270, 100, 'R');
+	lampOn(30, 30, 255);
+	delay(3000);*/
 
-	if (bLeft == HIGH) {          // If left bumper hit
-		Serial.println("bLeft");
+	/*if (irSenseR() > 2.0) {
+		bumpRight();
+		Serial.println("Bumped right, Distance: ");
+		Serial.println(irSenseR());
+		lampOn(0, 255, 0);
+	}
+	else {
+		lampOff();
+	}
+	delay(1000);*/
+
+	/*if (bLeft == HIGH) {          // If left bumper hit
+		Serial.println("Bumped left");
 		int notes[] = { NOTE_FS3, NOTE_F3 };
 		int noteDurations[] = { 2,3 };
 		reverse(70);
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
-		turnRight(90, 51);
+		turn(90, 80, 'R');
 		delay(1500);
 		forward(100);
 		bLeft = LOW;
 	}
 
 	if (bRight == HIGH) {          // If right bumper hit
-		Serial.println("bRight");
+		Serial.println("Bumped right");
 		int notes[] = { NOTE_F4, NOTE_D4 };
 		int noteDurations[] = { 2,3 };
 		reverse(70);
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
-		turnLeft(90, 51);
+		turn(90, 80, 'L');
 		delay(1500);
 		forward(100);
 		bRight = LOW;
-	}
-
-/*	if (irrecv.decode(&results)) {
-		switch (results.value) {
-		case 0x10:
-			Serial.println("1");     // Turn left, forward
-			turnLeftFwd();
-			break;
-		case 0x810:
-			Serial.println("2");     // Forward
-			forward();
-			break;
-		case 0x410:
-			Serial.println("3");     // Turn right, forward
-			turnRightFwd();
-			break;
-		case 0xC10:
-			Serial.println("4");     // Spin left
-			spinLeft();
-			break;
-		case 0x210:
-			Serial.println("5");     // Stop
-			stopRobot();
-			break;
-		case 0xA10:
-			Serial.println("6");     // Spin right
-			spinRight();
-			break;
-		case 0x610:
-			Serial.println("7");     // Turn left, reverse
-			turnLeftRev();
-			break;
-		case 0xE10:
-			Serial.println("8");     // Reverse
-			reverse();
-			break;
-		case 0x110:
-			Serial.println("9");     // Turn right, reverse
-			turnRightRev();
-			break;
-		}
-		irrecv.resume();     // Ready to receive next value
-		delay(2);
 	}*/
 
 	//::Left encoder variables with RotEncoder library::
@@ -199,10 +181,10 @@ void loop() {
 	float distLeft = leftEnc.distance(ticksLeft);
 	// Velocity, in relation to distance and interval that is
 	// specified here.
-	unsigned long intervalL = millis() - oldMillis;
-	if (intervalL > 400) {
+	unsigned long intervalL = millis() - oldMillisLeft;
+	if (intervalL > 800) {
 		velLeft = leftEnc.velocity(ticksLeft, intervalL, oldDistLeft);
-		oldMillis = millis();
+		oldMillisLeft = millis();
 	}
 
 	//::Right encoder variables with RotEncoder library::
@@ -212,20 +194,20 @@ void loop() {
 	float distRight = rightEnc.distance(ticksRight);
 	// Velocity, in relation to distance and interval that is
 	// specified here. (m/s)
-	unsigned long intervalR = millis() - oldMillis;
-	if (intervalR > 400) {
+	unsigned long intervalR = millis() - oldMillisRight;
+	if (intervalR > 800) {
 		velRight = rightEnc.velocity(ticksRight, intervalR, oldDistRight);
-		oldMillis = millis();
+		oldMillisRight = millis();
 	}
 
-	Serial.print("Left		Rotations: ");
+	/*Serial.print("Left	Rotations: ");
 	Serial.print(rotationsLeft);
 	Serial.print(" ; Distance: ");
 	Serial.print(distLeft);
 	Serial.print(" m");
 	Serial.print(" ; Speed: ");
 	Serial.print(velLeft);
-	Serial.print(" m/s	||		");
+	Serial.println(" m/s");
 	Serial.print("Right		Rotations: ");
 	Serial.print(rotationsRight);
 	Serial.print(" ; Distance: ");
@@ -234,7 +216,51 @@ void loop() {
 	Serial.print(" ; Speed: ");
 	Serial.print(velRight);
 	Serial.println(" m/s");
+	delay(10);*/
 
+
+	if (irrecv.decode(&results)) {
+		switch (results.value) {
+		case 0x10:
+			Serial.println("1");     // Turn left, forward
+			bankLeft(0.1, 90, 0);
+			break;
+		case 0x810:
+			Serial.println("2");     // Forward
+			forward(90);
+			break;
+		case 0x410:
+			Serial.println("3");     // Turn right, forward
+			bankRight(0.1, 90, 0);
+			break;
+		case 0xC10:
+			Serial.println("4");     // Spin left
+			turn(90, 90, 'L');
+			break;
+		case 0x210:
+			Serial.println("5");     // Stop
+			stop();
+			break;
+		case 0xA10:
+			Serial.println("6");     // Spin right
+			turn(90, 90, 'R');
+			break;
+		case 0x610:
+			Serial.println("7");     // Turn left, reverse
+			bankLeft(0.1, 90, 1);
+			break;
+		case 0xE10:
+			Serial.println("8");     // Reverse
+			reverse(90);
+			break;
+		case 0x110:
+			Serial.println("9");     // Turn right, reverse
+			bankRight(0.1, 90, 1);
+			break;
+		}
+		irrecv.resume();     // Ready to receive next value
+		delay(2);
+	}
 }
 
 
@@ -243,45 +269,42 @@ void makeTone(int notes[], int noteDurations[], int length) {
 	// Iterate over tones
 	for (int thisNote = 0; thisNote < length; thisNote++) {
 		int noteDuration = 500 / noteDurations[thisNote];
-		tone(12, notes[thisNote], noteDuration);
+		tone(SPEAKER_PIN, notes[thisNote], noteDuration);
 
 		// Pause to let the tone play, now with 30% extra pause
 		int pauseAfterTone = noteDuration * 1.30;
 		delay(pauseAfterTone);
-		noTone(12);     // Stop playing tone
+		noTone(SPEAKER_PIN);     // Stop playing tone
 	}
-	// irrecv.enableIRIn();
+	irrecv.enableIRIn();
 	return;
 }
 
 
 // Move <<motor>> with <<speed>> and <<direction>>
-//Motor: A for left, B for right
-//Speed: 0...255
-//direction: 0 is forward, 1 is backward
+// Motor: A for left, B for right
+// Speed: 0...255
+// Direction: 0 is forward, 1 is backward
 void move(char motor, byte speed, int direction) {
-	//Motor: A for left, B for right
-	//Speed: 0...255
-	//direction: 0 is forward, 1 is backward
 
-	digitalWrite(MOTOR_STBY_PIN, HIGH); //disable standby
+	digitalWrite(MOTOR_STBY_PIN, HIGH);	// Disable standby
 
-	boolean inPin1 = LOW;
-	boolean inPin2 = HIGH;
+	boolean in1PinValue = LOW;
+	boolean in2PinValue = HIGH;
 
 	if (direction == 1) {
-		inPin1 = HIGH;
-		inPin2 = LOW;
+		in1PinValue = HIGH;
+		in2PinValue = LOW;
 	}
 
 	if (motor == 'A') {
-		digitalWrite(MOTOR_AIN1_PIN, inPin2);
-		digitalWrite(MOTOR_AIN2_PIN, inPin1);
+		digitalWrite(MOTOR_AIN1_PIN, in1PinValue);
+		digitalWrite(MOTOR_AIN2_PIN, in2PinValue);
 		analogWrite(MOTOR_PWMA_PIN, speed);
 	}
 	else {
-		digitalWrite(MOTOR_BIN1_PIN, inPin1);
-		digitalWrite(MOTOR_BIN2_PIN, inPin2);
+		digitalWrite(MOTOR_BIN1_PIN, in1PinValue);
+		digitalWrite(MOTOR_BIN2_PIN, in2PinValue);
 		analogWrite(MOTOR_PWMB_PIN, speed);
 	}
 }
@@ -302,49 +325,81 @@ void reverse(byte speed) {
 	move('B', speed, 1);
 }
 
-// TODO: integrate speed sensors to bank with existing speed.
+// TODO: integrate speed sensors to bank with existing speed?
 // Turns right as it moves in <<direction>> with <<speed>>
 // Amount: 0...1, specifies sharpness of turning
 void bankRight(float amount, byte speed, int direction) {
 	byte Bspeed = byte((float)speed * amount);
 	move('A', speed, direction);
 	move('B', Bspeed, direction);
+	Serial.println("Banking right");
 }
 
-// Turns right as it moves in <<direction>> with <<speed>>
+// Turns left as it moves in <<direction>> with <<speed>>
 // Amount: 0...1, specifies sharpness of turning
 void bankLeft(float amount, byte speed, int direction) {
 	byte Aspeed = byte((float)speed * amount);
 	move('B', speed, direction);
 	move('A', Aspeed, direction);
+	Serial.println("Banking left");
 }
 
 // TODO: Bump sensing while turning
-// Turns left <<degrees>> with <<speed>> on the spot
-void turnLeft(int degrees, byte speed) {
-	unsigned int axle = 0;	// Length of line between wheels in mm
-	unsigned int distToTurn = axle * (degrees / 360) * 3.1416;
+// Turns <<degrees>> with <<speed>> in <<direction>> on the spot.
+// <<direction>> is 'l' or 'L' for left, or 'r' or 'R' for right.
+void turn(float degrees, byte speed, char direction) {
+	float axle = 155;	// Length of line between wheels in mm
+	float distToTurn = axle * (degrees / 360.0) * 3.1416;
 	unsigned int oldTicksLeft = ticksLeft;
-	volatile float distTurned = leftEnc.distance(ticksLeft - oldTicksLeft)/1000;
-	while (distTurned <= distToTurn) {
-		move('A', speed, 0);
-		move('B', speed, 1);
-		distTurned = leftEnc.distance(ticksLeft - oldTicksLeft)/1000;
-		delay(2);
+	volatile float distTurned = leftEnc.distance(ticksLeft - oldTicksLeft)/1000.0;
+	int dirA = 0;
+	int dirB = 1;
+
+	if (direction == 'l' || direction == 'L') {
+		dirA = 1;
+		dirB = 0;
 	}
+
+	Serial.println("Turning");
+
+	// 0.3 overhead when turning because of motor coasting
+	while (distTurned + 0.3 < distToTurn) {
+		if (bLeft || bRight) {
+			break;
+		}
+		move('A', speed, dirA);
+		move('B', speed, dirB);
+		distTurned = leftEnc.distance(ticksLeft - oldTicksLeft)*1000;
+	}
+	stop();
+	/*Serial.print("Turning: direction; degrees; speed; distToTurn		");
+	Serial.print(direction);
+	Serial.print("; ");
+	Serial.print(degrees);
+	Serial.print("; ");
+	Serial.print(speed);
+	Serial.print("; ");
+	Serial.print(distToTurn);
+	Serial.print("	DistTurned: ");
+	Serial.println(distTurned);*/
 }
 
-// Turns right <<degrees>> with <<speed>> on the spot
-void turnRight(int degrees, byte speed) {
-	unsigned int axle = 0;	// Length of line between wheels in mm
-	unsigned int distToTurn = axle * (degrees / 360) * 3.1416;
-	unsigned int oldTicksLeft = ticksLeft;
-	volatile float distTurned = leftEnc.distance(ticksLeft - oldTicksLeft) / 1000;
-	while (distTurned <= distToTurn) {
-		move('A', speed, 1);
-		move('B', speed, 0);
-		distTurned = leftEnc.distance(ticksLeft - oldTicksLeft) / 1000;
-	}
+// Changes global RGB intensity values and passes them to RGB led
+// 0 is off, 255 is max for each color
+void lampOn(unsigned int red, unsigned int green, unsigned int blue) {
+	redIntensity = red;
+	greenIntensity = green;
+	blueIntensity = blue;
+	analogWrite(RGB_R_PIN, redIntensity);
+	analogWrite(RGB_G_PIN, greenIntensity);
+	analogWrite(RGB_B_PIN, blueIntensity);
+}
+
+// Turns RGB led off
+void lampOff() {
+	analogWrite(RGB_R_PIN, 0);
+	analogWrite(RGB_G_PIN, 0);
+	analogWrite(RGB_B_PIN, 0);
 }
 
 //:::Interrupt handlers:::::::::::::::::::::::::::::::::::::::
