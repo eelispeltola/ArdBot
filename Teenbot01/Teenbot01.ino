@@ -120,70 +120,49 @@ void setup() {
 	attachInterrupt(ENCR_IN_PIN, tickRightEnc, CHANGE);
 
 	// Set interrupt for Sharp IS471f IR proximity sensor
-	attachInterrupt(IRSENSEL_PIN, bumpRight, RISING);
+	attachInterrupt(IRSENSEL_PIN, bumpLeft, FALLING);
 
 	started = true;
-
+	lampOn(255, 0, 0);
+	delay(1500);
 	lampOn(255, 0, 255);
 
 }
 
 void loop() {
 
-	/*lampOn(255, 0, 0);
-	delay(1000);
-	bankLeft(0.3, 200, 0);
-	delay(1000);
-	lampOn(255, 255, 255);
-	bankRight(0.1, 100, 1);
-	delay(1000);
-	lampOff();
-	forward(50);
-	delay(200);
-	lampOn(30, 0, 250);
-	turn(90, 70, 'L');
-	stop();
-	lampOn(50, 150, 0);
-	delay(1000);
-	lampOn(0, 255, 0);
-	turn(270, 100, 'R');
-	lampOn(30, 30, 255);
-	delay(3000);*/
-
-	/*if (irSenseR() > 2.0) {
+	if (irSenseR() > 2.0) {		// If obstacle at right sensor
 		bumpRight();
 		Serial.println("Bumped right, Distance: ");
 		Serial.println(irSenseR());
-		lampOn(0, 255, 0);
 	}
-	else {
-		lampOff();
-	}
-	delay(1000);*/
 
-	/*if (bLeft == HIGH) {          // If left bumper hit
+	// TODO: Replace delay with global timekeeping
+	if (bLeft == HIGH) {          // If left bumper hit
 		bLeft = LOW;
+		lampOn(0, 255, 0);
 		Serial.println("Bumped left");
 		int notes[] = { NOTE_FS3, NOTE_F3 };
 		int noteDurations[] = { 2,3 };
-		reverse(70);
+		reverse(140);
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
-		turn(90, 80, 'R');
-		forward(100);
+		turn(45, 200, 'R');
+		forward(170);
 	}
 
 	if (bRight == HIGH) {          // If right bumper hit
 		bRight = LOW;
+		lampOn(0, 0, 255);
 		Serial.println("Bumped right");
 		int notes[] = { NOTE_F4, NOTE_D4 };
 		int noteDurations[] = { 3,3 };
-		reverse(70);
+		reverse(140);
 		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
 		delay(500);
-		turn(90, 80, 'L');
-		forward(100);
-	}*/
+		turn(45, 200, 'L');
+		forward(170);
+	}
 
 	//::Left encoder variables with RotEncoder library::
 	// Number of rotations in floating point
@@ -234,7 +213,7 @@ void loop() {
 		switch (results.value) {
 		case 0x10:
 			Serial.println("1");     // Turn left, forward
-			bankLeft(0.1, 90, 0);
+			bankLeft(0.2, 90, 0);
 			break;
 		case 0x810:
 			Serial.println("2");     // Forward
@@ -242,7 +221,7 @@ void loop() {
 			break;
 		case 0x410:
 			Serial.println("3");     // Turn right, forward
-			bankRight(0.1, 90, 0);
+			bankRight(0.2, 90, 0);
 			break;
 		case 0xC10:
 			Serial.println("4");     // Spin left
@@ -258,7 +237,7 @@ void loop() {
 			break;
 		case 0x610:
 			Serial.println("7");     // Turn left, reverse
-			bankLeft(0.1, 90, 1);
+			bankLeft(0.2, 90, 1);
 			break;
 		case 0xE10:
 			Serial.println("8");     // Reverse
@@ -266,13 +245,14 @@ void loop() {
 			break;
 		case 0x110:
 			Serial.println("9");     // Turn right, reverse
-			bankRight(0.1, 90, 1);
+			bankRight(0.2, 90, 1);
 			break;
 		}
 		irrecv.resume();     // Ready to receive next value
 		delay(2);
 	}
 }
+
 
 // Measures presence of UV light for one ms, outputs unitless
 // distance-to-obstacle value. Takes ambient UV light into account.
@@ -316,21 +296,6 @@ float irSenseR() {
 	return avgDistance;
 }
 
-// Tones for piezo speaker
-void makeTone(int notes[], int noteDurations[], int length) {
-	// Iterate over tones
-	for (int thisNote = 0; thisNote < length; thisNote++) {
-		int noteDuration = 500 / noteDurations[thisNote];
-		tone(SPEAKER_PIN, notes[thisNote], noteDuration);
-
-		// Pause to let the tone play, now with 30% extra pause
-		int pauseAfterTone = noteDuration * 1.30;
-		delay(pauseAfterTone);
-		noTone(SPEAKER_PIN);     // Stop playing tone
-	}
-	irrecv.enableIRIn();
-	return;
-}
 
 // Move <<motor>> with <<speed>> and <<direction>>
 // Motor: A for left, B for right
@@ -379,18 +344,19 @@ void reverse(byte speed) {
 // TODO: integrate speed sensors to bank with existing speed?
 //		Or take existing speed from global variable.
 // Turns right as it moves in <<direction>> with <<speed>>
-// Amount: 0...1, specifies sharpness of turning
+// Amount: 0...1 specifies sharpness of turning, with
+// 1 being no turn at all and 0 a sharp turn.
 void bankRight(float amount, byte speed, int direction) {
-	byte Bspeed = byte((float)speed * amount);
+	byte Bspeed = byte((float)speed * (1 - amount));
 	move('A', speed, direction);
 	move('B', Bspeed, direction);
 	Serial.println("Banking right");
 }
 
 // Turns left as it moves in <<direction>> with <<speed>>
-// Amount: 0...1, specifies sharpness of turning
+// Amount: 0...1 specifies sharpness of turning
 void bankLeft(float amount, byte speed, int direction) {
-	byte Aspeed = byte((float)speed * amount);
+	byte Aspeed = byte((float)speed * (1 - amount));
 	move('B', speed, direction);
 	move('A', Aspeed, direction);
 	Serial.println("Banking left");
@@ -433,6 +399,22 @@ void turn(float degrees, byte speed, char direction) {
 	Serial.print(distToTurn);
 	Serial.print("	DistTurned: ");
 	Serial.println(distTurned);*/
+}
+
+// Tones for piezo speaker
+void makeTone(int notes[], int noteDurations[], int length) {
+	// Iterate over tones
+	for (int thisNote = 0; thisNote < length; thisNote++) {
+		int noteDuration = 300 / noteDurations[thisNote];
+		tone(SPEAKER_PIN, notes[thisNote], noteDuration);
+
+		// Pause to let the tone play, now with 30% extra pause
+		int pauseAfterTone = noteDuration * 1.30;
+		delay(pauseAfterTone);
+		noTone(SPEAKER_PIN);     // Stop playing tone
+	}
+	irrecv.enableIRIn();
+	return;
 }
 
 // Changes global RGB intensity values and passes them to RGB led
