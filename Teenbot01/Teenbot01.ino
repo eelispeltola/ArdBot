@@ -7,9 +7,9 @@
 	hall effect encoders, Sharp IS471F proximity detector
 	and Siemens SFH 205f photodiode (IR recv) with IR LEDs,
 	two USB webcams used by RPi w/ OpenCV
- Started 16.02.2016.
- Last modified 20.02.2016.
- epe
+ Started: 16.02.2016.
+ Last modified: 09.03.2016.
+ Author: Eelis Peltola
 */
 
 #include <RotEncoder.h>
@@ -17,30 +17,30 @@
 #include "pitches.h"
 
 // Pin designation:
-const int IRRECV_PWR_PIN = 13;	// IR (remote) receiver power
-const int IRRECV_GND_PIN = 14;	// IR receiver ground
-const int IRRECV_PIN = 15;	// IR receiver data in
+#define IRRECV_PWR_PIN 13	// IR (remote) receiver power
+#define IRRECV_GND_PIN 14	// IR receiver ground
+#define IRRECV_PIN 15	// IR receiver data in
 
-const int MOTOR_PWMA_PIN = 3;	// Left motor
-const int MOTOR_AIN2_PIN = 4;
-const int MOTOR_AIN1_PIN = 5;
-const int MOTOR_STBY_PIN = 6;	// Standby
-const int MOTOR_BIN1_PIN = 7;	// Right motor
-const int MOTOR_BIN2_PIN = 8;
-const int MOTOR_PWMB_PIN = 9;
+#define MOTOR_PWMA_PIN 3	// Left motor
+#define MOTOR_AIN2_PIN 4
+#define MOTOR_AIN1_PIN 5
+#define MOTOR_STBY_PIN 6	// Standby
+#define MOTOR_BIN1_PIN 7	// Right motor
+#define MOTOR_BIN2_PIN 8
+#define MOTOR_PWMB_PIN 9
 
-const int SPEAKER_PIN = 0;	// Piezo speaker
+#define SPEAKER_PIN 0	// Piezo speaker
 
-const int IRLEDR_PIN = 23;	// Right IR led
-const int IRSENSEL_PIN = A5;	// IS471F, left detector data in
-const int IRSENSER_PIN = A4;	// SHF 205f, right detector data in
+#define IRLEDR_PIN 23	// Right IR led
+#define IRSENSEL_PIN A5	// IS471F, left detector data in
+#define IRSENSER_PIN A4	// SHF 205f, right detector data in
 
-const int ENCL_IN_PIN = 1;	// Left encoder data in 
-const int ENCR_IN_PIN = 17;
+#define ENCL_IN_PIN 1	// Left encoder data in 
+#define ENCR_IN_PIN 17
 
-const int RGB_R_PIN = A8;	// Common cathode RGB led
-const int RGB_G_PIN = A7;
-const int RGB_B_PIN = A6;
+#define RGB_R_PIN A8	// Common cathode RGB led
+#define RGB_G_PIN A7
+#define RGB_B_PIN A6
 
 
 // Define IRremote objects
@@ -48,7 +48,7 @@ IRrecv irrecv(IRRECV_PIN);
 decode_results results;
 
 // Define encoder objects (redundant to have both, left for fluency
-// in anticipation of future changes of RotEncoder class.
+// in anticipation of future changes to RotEncoder class)
 RotEncoder leftEnc(62, 384);  // wheel diam (mm),
 							  // encoder ticks per rotation
 RotEncoder rightEnc(62, 384);  // wheel diam (mm)
@@ -72,6 +72,11 @@ unsigned long lastDebounceRight = 0;
 // Define variables for bumping
 volatile boolean bLeft = false;
 volatile boolean bRight = false;
+
+// Define variables for turning based on RPi commands
+int rpiTurnAmount = 0;
+int rpiTurnedAmount = 0;
+bool objInSight;
 
 // Define led intensities
 byte redIntensity = 0;
@@ -177,6 +182,7 @@ void loop() {
 		oldMillisLeft = millis();
 	}
 
+	/*
 	//::Right encoder variables with RotEncoder library::
 	// Number of rotations in floating point
 	volatile float rotationsRight = rightEnc.rotations(ticksRight);
@@ -189,8 +195,10 @@ void loop() {
 		velRight = rightEnc.velocity(ticksRight, intervalR, oldDistRight);
 		oldMillisRight = millis();
 	}
+	*/
 
-	/*Serial.print("Left	Rotations: ");
+	/*
+	Serial.print("Left	Rotations: ");
 	Serial.print(rotationsLeft);
 	Serial.print(" ; Distance: ");
 	Serial.print(distLeft);
@@ -206,8 +214,35 @@ void loop() {
 	Serial.print(" ; Speed: ");
 	Serial.print(velRight);
 	Serial.println(" m/s");
-	delay(10);*/
+	delay(10);
+	*/
 
+	if (Serial.available()) {
+		int rpiMessage = (int)Serial.read();
+		if (abs(rpiMessage) > 100) {
+			objInSight == false;
+		}
+		else {
+			rpiTurnAmount = rpiMessage;
+		}
+	}
+
+
+	// Turn based on RPi Serial commands.
+	// Both <<rpiTurnedAmount>> and <<rpiTurnAmount>>
+	// origos are at center of robot -> neg. values turn right
+	if (objInSight && !bLeft && !bRight) {
+		int amountToTurn = rpiTurnedAmount - rpiTurnAmount;
+		if (amountToTurn > 5) {
+			bankLeft(0.2, 90, 0);
+		}
+		if (amountToTurn < 5) {
+			bankRight(0.2, 90, 0);
+		}
+		else {
+			forward(90);
+		}
+	}
 
 	if (irrecv.decode(&results)) {
 		switch (results.value) {
