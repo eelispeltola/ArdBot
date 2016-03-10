@@ -125,4 +125,64 @@ if __name__ == '__main__':
         remappedImgL, remappedImgR, leftFrame, rightFrame\
             = remap_images(leftVid, rightVid, mapLx, mapLy, mapRx, mapRy)
 
+ 	# StereoSGBM values from trackbar for testing
+        min_disp = getTrackbarPos('minDisparity', 'tracks') * \
+            (1 - 2*getTrackbarPos('minDispSign', 'tracks'))*16
+        num_disp = getTrackbarPos('Disparities', 'tracks')*16 + 16
+        block_sz = getTrackbarPos('blockSize', 'tracks')
+        window_sz = getTrackbarPos('windowSize', 'tracks')
+        disp12_maxdiff = getTrackbarPos('disp12MaxDiff', 'tracks')
+        pre_filter_cap = getTrackbarPos('preFilterCap', 'tracks')
+        uniqueness = getTrackbarPos('uniqueness', 'tracks')
+        speckle_window_sz = getTrackbarPos('SpeckleWindowSize', 'tracks')
+        speckle_range = getTrackbarPos('SpeckleRange', 'tracks')
+        mode = STEREO_SGBM_MODE_HH
+
+        stereo = StereoSGBM_create(minDisparity=min_disp,
+                                   numDisparities=num_disp,
+                                   blockSize=block_sz,
+                                   P1=8*3*window_sz**2,
+                                   P2=32*3*window_sz**2,
+                                   disp12MaxDiff=disp12_maxdiff,
+                                   preFilterCap=pre_filter_cap,
+                                   uniquenessRatio=uniqueness,
+                                   speckleWindowSize=speckle_window_sz,
+                                   speckleRange=speckle_range,
+                                   mode=mode
+                                   )
+
+        # Alternative way to form stereo image:
+        '''
+        stereo = StereoBM_create(32, 31)
+        stereo.setDisp12MaxDiff(1)
+        stereo.setSpeckleRange(10)
+        stereo.setSpeckleWindowSize(9)
+        stereo.setUniquenessRatio(0)
+        stereo.setTextureThreshold(50)
+        stereo.setMinDisparity(-16)
+        stereo.setPreFilterCap(61)
+        stereo.setPreFilterSize(5)
+        '''
+
+        g1 = cvtColor(remappedImgL, COLOR_BGR2GRAY)
+        g2 = cvtColor(remappedImgR, COLOR_BGR2GRAY)
+
+        disparity = stereo.compute(g1, g2)
+        disparity8 = np.zeros((imgSize[0], imgSize[1], 3), np.uint8)
+        disparity8 = normalize(disparity, disparity8, 0, 255, NORM_MINMAX,
+                               CV_8U)
+
+        imshow("leftFrame", leftFrame)
+        imshow("rightFrame", rightFrame)
+        imshow("disparity", disparity8)
+
+        keyPress = waitKey(20)
+        if keyPress == 27 or keyPress == 1048603:
+            print("Pressed ESC key, terminating")
+            break
+
+    destroyAllWindows()
+    leftVid.release()
+    rightVid.release()
+
 
