@@ -6,8 +6,8 @@ Reads uncalibrated images, calculates calibration matrices and writes
 calibrated images.
 Project: TeenBot Disparity Map
 Author: Eelis Peltola
-Started: 07.03.2016
-Last modified: 07.03.2016
+Started: 10.03.2016
+Last modified: 11.03.2016
 """
 
 import cv2
@@ -272,6 +272,45 @@ print("extrinsics written")
 print("R1\n", RL, "\nR2\n", RR, "\nP1\n", PL, "\nP2\n", PR, "\nQ\n", Q,
       "\nroiL\n", roiL, "\nroiR\n", roiR)
 
+
+# TODO: Move to depth-mapping module? Or own debug function
+
+print("Undistorting images... ", end='')
+
+# Invert image size to width*height
+distImgSize = (stereo_imgsize[1], stereo_imgsize[0])
+
+mapLx, mapLy = cv2.initUndistortRectifyMap(cameraMatrixL, distCoeffsL, RL,
+                                           PL, distImgSize, cv2.CV_16SC2, None,
+                                           None)
+
+mapRx, mapRy = cv2.initUndistortRectifyMap(cameraMatrixR, distCoeffsR, RR,
+                                           PR, distImgSize, cv2.CV_16SC2, None,
+                                           None)
+
+# Show remapped versions of calibration images
+keyPressFlag = False
+cv2.namedWindow("Remapped left")
+cv2.namedWindow("Remapped right")
+for imL, imR in zip(stereo_imgnames_l, stereo_imgnames_r):
+    imgL = cv2.imread(imL)
+    remappedImgL = cv2.remap(src=imgL, map1=mapLx, map2=mapLy,
+                             interpolation=cv2.INTER_LINEAR)
+    cv2.imshow("Remapped left", remappedImgL)
+
+    imgR = cv2.imread(imR)
+    remappedImgR = cv2.remap(src=imgR, map1=mapRx, map2=mapRy,
+                             interpolation=cv2.INTER_LINEAR)
+    cv2.imshow("Remapped right", remappedImgR)
+
+    keyPress = cv2.waitKey(1500)
+    if keyPress == 27 or keyPress == 1048603:
+        print("pressed ESC, process stopped")
+        keyPressFlag = True
+        break
+
+if not keyPressFlag:
+    print("undistort complete")
 
 
 
