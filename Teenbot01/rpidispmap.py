@@ -86,3 +86,43 @@ def set_video_sizes(left_vid, right_vid, video_size):
     print(right_vid.get(CAP_PROP_FRAME_HEIGHT))
 
 
+if __name__ == '__main__':
+    leftVid = VideoCapture(1)
+    if not leftVid.isOpened():
+        print("Can't open vid 0")
+
+    rightVid = VideoCapture(2)
+    if not rightVid.isOpened():
+        print("Can't open vid 1")
+
+    # Desired image size as (width*height)
+    # (set video frames to 144p for performance)
+    imgSize = (640, 480)
+
+    set_video_sizes(leftVid, rightVid, imgSize)
+
+    namedWindow('tracks', 1)
+    createTrackbar('Disparities', 'tracks', 1, 15, nothing)
+    createTrackbar('minDisparity', 'tracks', 0, 3, nothing)
+    createTrackbar('minDispSign', 'tracks', 0, 1, nothing)
+    createTrackbar('blockSize', 'tracks', 3, 50, nothing)
+    createTrackbar('windowSize', 'tracks', 3, 50, nothing)
+    createTrackbar('disp12MaxDiff', 'tracks', 10, 200, nothing)
+    createTrackbar('preFilterCap', 'tracks', 5, 200, nothing)
+    createTrackbar('uniqueness', 'tracks', 0, 10, nothing)
+    createTrackbar('SpeckleWindowSize', 'tracks', 50, 150, nothing)
+    createTrackbar('SpeckleRange', 'tracks', 2, 50, nothing)
+
+    mapLx, mapLy, mapRx, mapRy = calculate_maps(imgSize)
+
+    namedWindow("Remapped left")
+    namedWindow("Remapped right")
+
+    print("Calculating disparity map... ", end='')
+
+    while True:
+
+        remappedImgL, remappedImgR, leftFrame, rightFrame\
+            = remap_images(leftVid, rightVid, mapLx, mapLy, mapRx, mapRy)
+
+
