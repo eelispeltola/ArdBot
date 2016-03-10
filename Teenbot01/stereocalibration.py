@@ -148,3 +148,130 @@ cameraMatrixL, cameraMatrixR, distCoeffsL, distCoeffsR\
     = calib(imnl, imnr, boardSize, patternPoints)
 
 
+# TODO: Move to own calibration function/modify existing to include stereo
+stereo_objpoints = []
+stereo_imgpoints_l = []
+stereo_imgpoints_r = []
+stereo_imgsize = cv2.imread(stereo_imgnames_l[0], 0).shape[:2]
+print("Image size:", stereo_imgsize)
+
+cv2.namedWindow("left corners")
+cv2.namedWindow("right corners")
+
+print("Locating chessboard corners in images \n    {} and \n    {}"
+      .format(stereo_imgmask_l, stereo_imgmask_r))
+
+for fnL, fnR in zip(stereo_imgnames_l, stereo_imgnames_r):
+    print("Reading {} and {}... ".format(fnL.split('/')[-1],
+                                         fnR.split('/')[-1]), end='')
+    imgL = cv2.imread(fnL, 0)
+    imgR = cv2.imread(fnR, 0)
+
+    if imgL is None:
+        print("failed to load ", fnL)
+        continue
+
+    if imgR is None:
+        print("failed to load ", fnR)
+        continue
+
+    if imgL.shape[:2] != stereo_imgsize or imgR.shape[:2] != stereo_imgsize:
+        print("dimensions of {} or {} do not match".format(fnL, fnR))
+        continue
+
+#    h, w = imgL.shape[:2]
+    foundL, cornersL = cv2.findChessboardCorners(imgL, boardSize,
+                                                 cv2.CALIB_CB_ADAPTIVE_THRESH |
+                                                 cv2.CALIB_CB_NORMALIZE_IMAGE)
+    foundR, cornersR = cv2.findChessboardCorners(imgR, boardSize,
+                                                 cv2.CALIB_CB_ADAPTIVE_THRESH |
+                                                 cv2.CALIB_CB_NORMALIZE_IMAGE)
+
+    if foundL:
+        term = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 30, 0.1)
+        cv2.cornerSubPix(imgL, cornersL, (5, 5), (-1, -1), term)
+        visL = cv2.cvtColor(imgL, cv2.COLOR_GRAY2BGR)
+        cv2.drawChessboardCorners(visL, boardSize, cornersL, foundL)
+        cv2.imshow("left corners", visL)
+
+    else:
+        print("chessboard not found in {}".format(fnL))
+        continue
+
+    if foundR:
+        term = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 30, 0.1)
+        cv2.cornerSubPix(imgR, cornersR, (5, 5), (-1, -1), term)
+        visR = cv2.cvtColor(imgR, cv2.COLOR_GRAY2BGR)
+        cv2.drawChessboardCorners(visR, boardSize, cornersR, foundR)
+        cv2.imshow("right corners", visR)
+
+    else:
+        print("chessboard not found in {}".format(fnR))
+        continue
+
+    stereo_imgpoints_l.append(cornersL.reshape(-1, 2))
+    stereo_imgpoints_r.append(cornersR.reshape(-1, 2))
+    stereo_objpoints.append(patternPoints)
+
+    print("corners located")
+
+    keyPress = cv2.waitKey(corner_wait_time)
+
+    if keyPress == 27 or keyPress == 1048603:
+        print("Pressed ESC, process stopped")
+        break
+
+cv2.destroyAllWindows()
+
+print("\nRunning stereo calibration... ", end='')
+
+rms, cameraMatrixL, distCoeffsL, cameraMatrixR, distCoeffsR, R, T, E, F \
+    = cv2.stereoCalibrate(objectPoints=stereo_objpoints,
+                          imagePoints1=stereo_imgpoints_l,
+                          imagePoints2=stereo_imgpoints_r,
+                          cameraMatrix1=cameraMatrixL,
+                          distCoeffs1=distCoeffsL,
+                          cameraMatrix2=cameraMatrixR,
+                          distCoeffs2=distCoeffsR,
+                          imageSize=stereo_imgsize,
+                          R=None, T=None, E=None, F=None,
+                          flags=(cv2.CALIB_FIX_ASPECT_RATIO +
+                                 cv2.CALIB_FIX_INTRINSIC),
+                          criteria=(cv2.TERM_CRITERIA_COUNT +
+                                    cv2.TERM_CRITERIA_EPS, 300, 1e-6))
+
+print("calibrated with RMS error =", rms)
+print("\nCamera matrices (L and R respectively):\n", cameraMatrixL,
+      "\n \n", cameraMatrixR)
+print("\nDistortion coefficients:\n", distCoeffsL.ravel(), "\n \n",
+      distCoeffsR.ravel(), "\n")
+print("Rotational matrix between camera 1 and camera 2 \n", R, "\n")
+print("Translational matrix between camera 1 and camera 2 \n", T, "\n")
+
+print("Writing intrinsics to /data/intrinsics.yml... ", end='')
+with open("../data/instrinsics.yml", 'w') as intrStream:
+    yaml.dump_all(["CM1", cameraMatrixL, "D1", distCoeffsL, "CM2",
+                   cameraMatrixR, "D2", distCoeffsR], intrStream)
+print("intrinsics written")
+
+
+print("Writing extrinsics to /data/extrinsics.yml... ", end='')
+RL, RR, PL, PR, Q, \
+    roiL, roiR = cv2.stereoRectify(cameraMatrix1=cameraMatrixL,
+                                   distCoeffs1=distCoeffsL,
+                                   cameraMatrix2=cameraMatrixR,
+                                   distCoeffs2=distCoeffsR,
+                                   imageSize=stereo_imgsize,
+                                   R=R, T=T, R1=None, R2=None,
+                                   P1=None, P2=None, Q=None,
+                                   alpha=0,
+                                   newImageSize=stereo_imgsize)
+with open("../data/extrinsics.yml", 'w') as extrStream:
+    yaml.dump_all(["R1", RL, "R2", RR, "P1", PL, "P2", PR, "Q", Q], extrStream)
+print("extrinsics written")
+print("R1\n", RL, "\nR2\n", RR, "\nP1\n", PL, "\nP2\n", PR, "\nQ\n", Q,
+      "\nroiL\n", roiL, "\nroiR\n", roiR)
+
+
+
+
