@@ -8,7 +8,7 @@
 	and Siemens SFH 205f photodiode (IR recv) with IR LEDs,
 	two USB webcams used by RPi w/ OpenCV
  Started: 16.02.2016.
- Last modified: 09.03.2016.
+ Last modified: 25.04.2016.
  Author: Eelis Peltola
 */
 
@@ -59,8 +59,6 @@ unsigned long oldMillisLeft = 0;
 unsigned long oldMillisRight = 0;
 float oldDistLeft = 0;
 float oldDistRight = 0;
-float velLeft = 0;
-float velRight = 0;
 
 // Variables for encoder interrupts and debouncing
 volatile unsigned int ticksLeft = 0;
@@ -72,6 +70,7 @@ unsigned long lastDebounceRight = 0;
 // Define variables for bumping
 volatile boolean bLeft = false;
 volatile boolean bRight = false;
+
 
 // Define variables for turning based on RPi commands
 int rpiTurnAmount = 0;
@@ -142,81 +141,22 @@ void loop() {
 		Serial.println(irSenseR());
 	}
 
-	// TODO: Replace delay with global timekeeping
+	
 	if (bLeft == HIGH) {          // If left bumper hit
 		bLeft = LOW;
-		lampOn(0, 255, 0);
-		Serial.println("Bumped left");
-		int notes[] = { NOTE_FS3, NOTE_F3 };
-		int noteDurations[] = { 2,3 };
-		reverse(140);
-		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
-		delay(500);
-		turn(45, 200, 'R');
-		forward(170);
+		bumpMovement('L');
 	}
 
 	if (bRight == HIGH) {          // If right bumper hit
 		bRight = LOW;
-		lampOn(0, 0, 255);
-		Serial.println("Bumped right");
-		int notes[] = { NOTE_F4, NOTE_D4 };
-		int noteDurations[] = { 3,3 };
-		reverse(140);
-		makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
-		delay(500);
-		turn(45, 200, 'L');
-		forward(170);
+		bumpMovement('R');
 	}
 
-	//::Left encoder variables with RotEncoder library::
-	// Number of rotations in floating point
-	volatile float rotationsLeft = leftEnc.rotations(ticksLeft);
-	// Distance, in relation to wheel size.
-	float distLeft = leftEnc.distance(ticksLeft);
-	// Velocity, in relation to distance and interval that is
-	// specified here.
-	unsigned long intervalL = millis() - oldMillisLeft;
-	if (intervalL > 800) {
-		velLeft = leftEnc.velocity(ticksLeft, intervalL, oldDistLeft);
-		oldMillisLeft = millis();
-	}
-
-	/*
-	//::Right encoder variables with RotEncoder library::
-	// Number of rotations in floating point
-	volatile float rotationsRight = rightEnc.rotations(ticksRight);
-	// Distance, in relation to wheel size. (m)
-	float distRight = rightEnc.distance(ticksRight);
-	// Velocity, in relation to distance and interval that is
-	// specified here. (m/s)
-	unsigned long intervalR = millis() - oldMillisRight;
-	if (intervalR > 800) {
-		velRight = rightEnc.velocity(ticksRight, intervalR, oldDistRight);
-		oldMillisRight = millis();
-	}
-	*/
-
-	/*
-	Serial.print("Left	Rotations: ");
-	Serial.print(rotationsLeft);
-	Serial.print(" ; Distance: ");
-	Serial.print(distLeft);
-	Serial.print(" m");
-	Serial.print(" ; Speed: ");
-	Serial.print(velLeft);
-	Serial.println(" m/s");
-	Serial.print("Right		Rotations: ");
-	Serial.print(rotationsRight);
-	Serial.print(" ; Distance: ");
-	Serial.print(distRight);
-	Serial.print(" m");
-	Serial.print(" ; Speed: ");
-	Serial.print(velRight);
-	Serial.println(" m/s");
-	delay(10);
-	*/
-
+	
+	// Check serial bus for messages. A number more than +-100
+	// means no object is in sight, lower is amount that must be
+	// turned (-100...100).
+	// TODO: Proper handling of messages, conversion byte->int
 	if (Serial.available()) {
 		int rpiMessage = (int)Serial.read();
 		if (abs(rpiMessage) > 100) {
@@ -244,49 +184,58 @@ void loop() {
 		}
 	}
 
+	// If IR Receiver commands are available,
+	// move based on them.
 	if (irrecv.decode(&results)) {
-		switch (results.value) {
-		case 0x10:
-			Serial.println("1");     // Turn left, forward
-			bankLeft(0.2, 90, 0);
-			break;
-		case 0x810:
-			Serial.println("2");     // Forward
-			forward(90);
-			break;
-		case 0x410:
-			Serial.println("3");     // Turn right, forward
-			bankRight(0.2, 90, 0);
-			break;
-		case 0xC10:
-			Serial.println("4");     // Spin left
-			turn(90, 90, 'L');
-			break;
-		case 0x210:
-			Serial.println("5");     // Stop
-			stop();
-			break;
-		case 0xA10:
-			Serial.println("6");     // Spin right
-			turn(90, 90, 'R');
-			break;
-		case 0x610:
-			Serial.println("7");     // Turn left, reverse
-			bankLeft(0.2, 90, 1);
-			break;
-		case 0xE10:
-			Serial.println("8");     // Reverse
-			reverse(90);
-			break;
-		case 0x110:
-			Serial.println("9");     // Turn right, reverse
-			bankRight(0.2, 90, 1);
-			break;
-		}
-		irrecv.resume();     // Ready to receive next value
-		delay(2);
+		receiverMovement(results);
 	}
 }
+
+
+// Switch direction based on IR Receiver commands
+void receiverMovement(decode_results results) {
+	switch (results.value) {
+	case 0x10:
+		Serial.println("1");
+		bankLeft(0.2, 90, 0);     // Turn left, forward
+		break;
+	case 0x810:
+		Serial.println("2");
+		forward(90);     // Move forward
+		break;
+	case 0x410:
+		Serial.println("3");
+		bankRight(0.2, 90, 0);     // Turn right, forward
+		break;
+	case 0xC10:
+		Serial.println("4");
+		turn(90, 90, 'L');     // Spin left
+		break;
+	case 0x210:
+		Serial.println("5");
+		stop();    // Stop
+		break;
+	case 0xA10:
+		Serial.println("6");
+		turn(90, 90, 'R');     // Spin right
+		break;
+	case 0x610:
+		Serial.println("7");
+		bankLeft(0.2, 90, 1);     // Turn left, reverse
+		break;
+	case 0xE10:
+		Serial.println("8");
+		reverse(90);     // Reverse
+		break;
+	case 0x110:
+		Serial.println("9");
+		bankRight(0.2, 90, 1);     // Turn right, reverse
+		break;
+	}
+	irrecv.resume();     // Ready to receive next value
+	delay(2);
+}
+
 
 
 // Measures presence of UV light for one ms, outputs unitless
@@ -331,6 +280,37 @@ float irSenseR() {
 	return avgDistance;
 }
 
+
+// TODO: Replace delay with global timekeeping
+// Reverse and turn after a bumper hit.
+// <<bumpDir>> is 'L' or 'R' for side of bumper.
+void bumpMovement(char bumpDir) {
+	char turnDir;
+	int notes[2];
+	if (bumpDir == 'L') {
+		lampOn(0, 255, 0);
+		notes[0] = NOTE_FS3;
+		notes[1] = NOTE_F3;
+		turnDir = 'R';
+	}
+	else if (bumpDir == 'R') {
+		lampOn(0, 0, 255);
+		notes[0] = NOTE_F4;
+		notes[1] = NOTE_D4;
+		turnDir = 'L';
+	}
+	else {
+		return;
+	}
+	Serial.print("Bumped ");
+	Serial.println(bumpDir);
+	int noteDurations[] = { 2,3 };
+	reverse(140);
+	makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
+	delay(500);
+	turn(45, 200, turnDir);
+	forward(170);
+}
 
 // Move <<motor>> with <<speed>> and <<direction>>
 // Motor: A for left, B for right
@@ -434,6 +414,45 @@ void turn(float degrees, byte speed, char direction) {
 	Serial.print(distToTurn);
 	Serial.print("	DistTurned: ");
 	Serial.println(distTurned);*/
+}
+
+
+// Calculate wheel encoder values and modify <<encValues[]>>
+// to keep rotations, distance and velocity based on encoder.
+void calculateEncValues(RotEncoder enc,
+						volatile unsigned int ticks,
+						unsigned long &oldMillis,
+						float oldDistance,
+						float encValues[]) {
+
+	//::Encoder variables with RotEncoder library::
+	// Number of rotations in floating point
+	volatile float rotations = enc.rotations(ticks);
+	// Distance, in relation to wheel size.
+	float distance = enc.distance(ticks);
+	// Velocity, in relation to distance and interval that is
+	// specified here.
+	unsigned long interval = millis() - oldMillis;
+	float velocity = -1;
+	if (interval > 800) {
+		float velocity = enc.velocity(ticks, interval, oldDistance);
+		oldMillis = millis();
+	}
+
+	Serial.print("Rotations: ");
+	Serial.print(rotations);
+	Serial.print(" ; Distance: ");
+	Serial.print(distance);
+	Serial.print(" m");
+	Serial.print(" ; Speed: ");
+	Serial.print(velocity);
+	Serial.println(" m/s");
+	delay(10);
+
+	encValues[0] = rotations;
+	encValues[1] = distance;
+	encValues[2] = velocity;
+
 }
 
 // Tones for piezo speaker
