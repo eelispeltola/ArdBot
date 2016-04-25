@@ -42,6 +42,22 @@
 #define RGB_G_PIN A7
 #define RGB_B_PIN A6
 
+#define DEBUG	// Comment out to omit debug messages
+
+
+// <<DEBUG_PRINT(str)>> accompanies data for a given string
+#ifdef DEBUG
+#define DEBUG_PRINT(str) \
+	Serial.print(millis()); \
+	Serial.print(": "); \
+	Serial.print(__FUNCTION__); \
+	Serial.print("() in "); \
+	Serial.print(__FILE__); \
+	Serial.print(':'); \
+	Serial.print(__LINE__); \
+	Serial.print(' '); \
+	Serial.println(str);
+#endif // !DEBUG
 
 // Define IRremote objects
 IRrecv irrecv(IRRECV_PIN);
@@ -137,8 +153,12 @@ void loop() {
 
 	if (irSenseR() > 2.0) {		// If obstacle at right sensor
 		bumpRight();
-		Serial.println("Bumped right, Distance: ");
-		Serial.println(irSenseR());
+		DEBUG_PRINT("irSenseRBump");
+	#ifdef DEBUG
+	Serial.println("Bumped right, Distance: ");
+	Serial.println(irSenseR());
+	#endif // !DEBUG
+
 	}
 
 	
@@ -196,39 +216,39 @@ void loop() {
 void receiverMovement(decode_results results) {
 	switch (results.value) {
 	case 0x10:
-		Serial.println("1");
+		DEBUG_PRINT("1");
 		bankLeft(0.2, 90, 0);     // Turn left, forward
 		break;
 	case 0x810:
-		Serial.println("2");
+		DEBUG_PRINT("2");
 		forward(90);     // Move forward
 		break;
 	case 0x410:
-		Serial.println("3");
+		DEBUG_PRINT("3");
 		bankRight(0.2, 90, 0);     // Turn right, forward
 		break;
 	case 0xC10:
-		Serial.println("4");
+		DEBUG_PRINT("4");
 		turn(90, 90, 'L');     // Spin left
 		break;
 	case 0x210:
-		Serial.println("5");
+		DEBUG_PRINT("5");
 		stop();    // Stop
 		break;
 	case 0xA10:
-		Serial.println("6");
+		DEBUG_PRINT("6");
 		turn(90, 90, 'R');     // Spin right
 		break;
 	case 0x610:
-		Serial.println("7");
+		DEBUG_PRINT("7");
 		bankLeft(0.2, 90, 1);     // Turn left, reverse
 		break;
 	case 0xE10:
-		Serial.println("8");
+		DEBUG_PRINT("8");
 		reverse(90);     // Reverse
 		break;
 	case 0x110:
-		Serial.println("9");
+		DEBUG_PRINT("9");
 		bankRight(0.2, 90, 1);     // Turn right, reverse
 		break;
 	}
@@ -264,14 +284,18 @@ float irSenseR() {
 		distanceToObstacle += irValues[i];
 	}
 
-	/*Serial.print("Right IR values: ");
+	#ifdef DEBUG
+	DEBUG_PRINT("IR LED");
+	Serial.print("Right IR values: ");
 	float distancetotarget = 0;
 	for (i = 0; i < cycles; i++) {
 	distancetotarget += irValues[i];
 	Serial.print(irValues[i]);
 	Serial.print(";");
 	}
-	Serial.println("");*/
+	Serial.println("");
+	#endif // DEBUG
+	
 
 	// Distance is given as average of distances for the whole millisecond.
 	float avgDistance = distanceToObstacle / (float)cycles;
@@ -302,8 +326,12 @@ void bumpMovement(char bumpDir) {
 	else {
 		return;
 	}
+
+	#ifdef DEBUG
 	Serial.print("Bumped ");
 	Serial.println(bumpDir);
+	#endif // DEBUG
+	
 	int noteDurations[] = { 2,3 };
 	reverse(140);
 	makeTone(notes, noteDurations, sizeof(notes) / sizeof(int));
@@ -365,7 +393,7 @@ void bankRight(float amount, byte speed, int direction) {
 	byte Bspeed = byte((float)speed * (1 - amount));
 	move('A', speed, direction);
 	move('B', Bspeed, direction);
-	Serial.println("Banking right");
+	DEBUG_PRINT("Banking right");
 }
 
 // Turns left as it moves in <<direction>> with <<speed>>
@@ -374,7 +402,7 @@ void bankLeft(float amount, byte speed, int direction) {
 	byte Aspeed = byte((float)speed * (1 - amount));
 	move('B', speed, direction);
 	move('A', Aspeed, direction);
-	Serial.println("Banking left");
+	DEBUG_PRINT("Banking left");
 }
 
 // Turns <<degrees>> with <<speed>> in <<direction>> on the spot.
@@ -392,7 +420,7 @@ void turn(float degrees, byte speed, char direction) {
 		dirB = 0;
 	}
 
-	Serial.println("Turning");
+	DEBUG_PRINT("Turning");
 
 	// 0.3 overhead when turning because of motor coasting
 	while (distTurned + 0.3 < distToTurn) {
@@ -404,7 +432,9 @@ void turn(float degrees, byte speed, char direction) {
 		distTurned = leftEnc.distance(ticksLeft - oldTicksLeft)*1000;
 	}
 	stop();
-	/*Serial.print("Turning: direction; degrees; speed; distToTurn		");
+
+	#ifdef DEBUG
+	Serial.print("Turning: direction; degrees; speed; distToTurn		");
 	Serial.print(direction);
 	Serial.print("; ");
 	Serial.print(degrees);
@@ -413,7 +443,8 @@ void turn(float degrees, byte speed, char direction) {
 	Serial.print("; ");
 	Serial.print(distToTurn);
 	Serial.print("	DistTurned: ");
-	Serial.println(distTurned);*/
+	Serial.println(distTurned);
+	#endif // DEBUG
 }
 
 
@@ -439,6 +470,7 @@ void calculateEncValues(RotEncoder enc,
 		oldMillis = millis();
 	}
 
+	#ifdef DEBUG
 	Serial.print("Rotations: ");
 	Serial.print(rotations);
 	Serial.print(" ; Distance: ");
@@ -448,7 +480,8 @@ void calculateEncValues(RotEncoder enc,
 	Serial.print(velocity);
 	Serial.println(" m/s");
 	delay(10);
-
+	#endif // DEBUG
+	
 	encValues[0] = rotations;
 	encValues[1] = distance;
 	encValues[2] = velocity;
